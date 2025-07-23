@@ -70,47 +70,11 @@ const JSList = {
 		"navigations": 2,
 		"locate": "<div class=\"cf-browser-verification cf-im-under-attack\">"
 	},
-	{
-		"name": "BlazingFast v1.0",
-		"navigations": 1,
-		"locate": "<br>DDoS Protection by</font> Blazingfast.io</a>"
-	},
-	{
-		"name": "BlazingFast v2.0",
-		"navigations": 1,
-		"locate": "Verifying your browser, please wait...<br>DDoS Protection by</font> Blazingfast.io</a></h1>"
-	},
-	{
-		"name": "Sucuri",
-		"navigations": 4,
-		"locate": "<html><title>You are being redirected...</title>"
-	},
-	{
-		"name": "StackPath",
-		"navigations": 4,
-		"locate": "<title>Site verification</title>"
-	},
-	{
-		"name": "StackPath EnforcedJS",
-		"navigations": 4,
-		"locate": "<title>StackPath</title>"
-	}, {
-		"name": "React",
-		"navigations": 1,
-		"locate": "Check your browser..."
 	}, {
 		"name": "DDoS-Guard",
 		"navigations": 1,
 		"locate": "DDoS protection by DDos-Guard"
-	}, {
-		"name": "VShield",
-		"navigations": 1,
-		"locate": "fw.vshield.pro/v2/bot-detector.js"
-	}, {
-		"name": "GameSense",
-		"navigations": 1,
-		"locate": "<title>GameSense</title>"
-	}]
+	}, {]
 }
 
 function sleep(ms) {
