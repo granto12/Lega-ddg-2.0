@@ -73,7 +73,7 @@ const JSList = {
 	}, {
 		"name": "DDoS-Guard",
 		"navigations": 1,
-		"locate": "DDoS protection by DDos-Guard"
+		"locate": "document.getElementById("title").innerHTML="Проверка браузера перед переходом на сайт "+host;"
 	}, {]
 }
 
