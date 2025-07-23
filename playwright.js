@@ -79,60 +79,95 @@ function JSDetection(html) {
 
 // 🎯 Основная функция
 async function solverInstance(args) {
-  log(`(${`PlayWright`.cyan}) Запуск браузера.`);
+ log(`(${`PlayWright`.cyan}) Запуск браузера.`);
 
-  const browser = await playwright.firefox.launch({
-    headless: true,
-    proxy: {
-      server: `http://${args.Proxy}`
+const browser = await playwright.chromium.launch({
+  headless: true,
+  proxy: {
+    server: `http://${args.Proxy}`
+  },
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--disable-blink-features=AutomationControlled'
+  ]
+});
+
+// 🎲 Рандомный профиль: десктоп или iPhone
+function getRandomUAConfig() {
+  const configs = [
+    {
+      name: 'Windows Chrome',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 1,
+      isMobile: false,
+      hasTouch: false
+    },
+    {
+      name: 'iPhone Safari',
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 3,
+      isMobile: true,
+      hasTouch: true
     }
+  ];
+  return configs[Math.floor(Math.random() * configs.length)];
+}
+
+const uaConfig = getRandomUAConfig();
+log(`(${`UA`.cyan}) Используется профиль: ${uaConfig.name.green}`);
+
+const context = await browser.newContext({
+  userAgent: uaConfig.userAgent,
+  viewport: uaConfig.viewport,
+  deviceScaleFactor: uaConfig.deviceScaleFactor,
+  isMobile: uaConfig.isMobile,
+  hasTouch: uaConfig.hasTouch
+});
+
+const page = await context.newPage();
+
+
+await page.addInitScript(() => {
+  Object.defineProperty(navigator, 'webdriver', { get: () => false });
+
+  window.chrome = { runtime: {} };
+
+  Object.defineProperty(navigator, 'languages', {
+    get: () => ['en-US', 'en']
+  }); из
+
+  Object.defineProperty(navigator, 'plugins', {
+    get: () => [1, 2, 3, 4, 5]
   });
 
-  // 🎲 Рандом между ПК и iPhone
-  function getRandomUAConfig() {
-    const configs = [
-      {
-        name: 'Windows Chrome',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        viewport: { width: 1920, height: 1080 },
-        deviceScaleFactor: 1,
-        isMobile: false,
-        hasTouch: false
-      },
-      {
-        name: 'iPhone Safari',
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-        viewport: { width: 390, height: 844 },
-        deviceScaleFactor: 3,
-        isMobile: true,
-        hasTouch: true
-      }
-    ];
-    return configs[Math.floor(Math.random() * configs.length)];
-  }
+  const getParameter = WebGLRenderingContext.prototype.getParameter;
+  WebGLRenderingContext.prototype.getParameter = function (parameter) {
+    if (parameter === 37445) return 'Intel Inc.';
+    if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+    return getParameter(parameter);
+  };
 
-  const uaConfig = getRandomUAConfig();
-  log(`(${`UA`.cyan}) Используется профиль: ${uaConfig.name.green}`);
+  const originalQuery = window.navigator.permissions.query;
+  window.navigator.permissions.query = (parameters) => (
+    parameters.name === 'notifications'
+      ? Promise.resolve({ state: Notification.permission })
+      : originalQuery(parameters)
+  );
+});
 
-  const context = await browser.newContext({
-    userAgent: uaConfig.userAgent,
-    viewport: uaConfig.viewport,
-    deviceScaleFactor: uaConfig.deviceScaleFactor,
-    isMobile: uaConfig.isMobile,
-    hasTouch: uaConfig.hasTouch
-  });
+try {
+  await page.goto(args.Target, { waitUntil: 'domcontentloaded' });
+} catch (e) {
+  await browser.close();
+  throw e;
+}
 
-  const page = await context.newPage();
-
-  try {
-    await page.goto(args.Target);
-  } catch (e) {
-    await browser.close();
-    throw e;
-  }
-
-  log(`(${`PlayWright`.cyan}) UA: ${uaConfig.userAgent.green}`);
-
+log(`(${`PlayWright`.cyan}) UA: ${uaConfig.userAgent.green}`);
   // Первая проверка
   await processProtection(page, 'JSDetect [1/2]');
 
