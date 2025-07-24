@@ -7,8 +7,8 @@ const args = {
   Target: "https://legalizer.cc",
   Time: "3600",
   Method: "TLSv1",
-  Rate: "1000",
-  Threads: 5
+  Rate: "299",
+  Threads: "5"
 };
 const JSList = {
   js: [
@@ -18,7 +18,7 @@ const JSList = {
       locate: '<h2 class="h2" id="challenge-running">'
     },
     {
-      name: "CloudFlare (Normal JS)",// не рабоьает sf в разработке
+      name: "CloudFlare (Normal JS)",// не рабоьает sf в разработке . можеие сами там в html найти бокс кнопки и сделть нажатие. если не забуду скину черкз время.
       navigations: 2,
       locate: '<div class="cf-browser-verification cf-im-under-attack">'
     },
