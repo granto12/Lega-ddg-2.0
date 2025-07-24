@@ -168,6 +168,7 @@ try {
 }
 
 log(`(${`PlayWright`.cyan}) UA: ${uaConfig.userAgent.green}`);
+const ua = uaConfig.userAgent
   // Первая проверка
   await processProtection(page, 'JSDetect [1/2]');
 
