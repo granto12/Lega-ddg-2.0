@@ -8,7 +8,7 @@ const args = {
   Time: "3600",
   Method: "TLSv1",
   Rate: "299",
-  Threads: "5"
+  Threads: "1"
 };
 const JSList = {
   js: [
