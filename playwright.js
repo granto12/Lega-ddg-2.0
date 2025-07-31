@@ -1,8 +1,8 @@
 const axios = require('axios');
 
 const url = 'https://vire.cc/api/v1/start?user=ce58a816-a641-406f-a60f-b52119e81154&target=https://legalizer.cc&time=60&method=JS-ENGINE';
-const frequency = 20; // Количество запросов в секунду
-const interval = 1000 / frequency; // Интервал между запросами в миллисекундах
+const frequency = 1; // Количество запросов в секунду
+const interval = 300 / frequency; // Интервал между запросами в миллисекундах
 
 let intervalId = setInterval(async () => {
     try {
